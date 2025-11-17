@@ -86,3 +86,71 @@ class StartDialog(tk.Toplevel):
 
     def _on_close(self):
         self.master.destroy()
+
+class App(tk.Tk):
+    def handle_msg(self, m):
+        t = m.get("type")
+        if t == "state":
+            self.N, self.K = int(m.get("N", self.N)), int(m.get("K", self.K))
+            if len(self.btns) != self.N * self.N:
+                self.rebuild_board(self.N)
+
+            self.board = m["board"]
+            self.turn.set(m.get("turn", "-"))
+            self.winline = m.get("winline", []) or []
+            winner = (m.get("winner") or "")
+
+            # cập nhật tỉ số nếu server gửi
+            score = m.get("score")
+            if isinstance(score, dict):
+                self.score = {**{"X": 0, "O": 0, "D": 0}, **score}
+                self.score_label.configure(
+                    text=f"Tỉ số: X {self.score['X']} - {self.score['O']} O (Hòa: {self.score['D']})"
+                )
+
+            # kẻ & highlight
+            winset = set(self.winline)
+            for i in range(self.N * self.N):
+                val = self.board[i]
+                self._paint_cell(i, val, i in winset)
+
+            # trạng thái
+            self.turn_badge.configure(text=f"Lượt: {self.turn.get()}", style="Badge.TLabel")
+            if winner == "D":
+                self.res_badge.configure(text="Kết quả: Hòa", style="BadgeOK.TLabel")
+            elif winner in ("X", "O"):
+                self.res_badge.configure(text=f"Kết quả: {winner} thắng", style="BadgeOK.TLabel")
+            else:
+                self.res_badge.configure(text="Kết quả: ...", style="Badge.TLabel")
+
+            # Cho phép bấm ô nếu chưa hết ván; server vẫn kiểm tra lượt
+            if winner:
+                for i in range(self.N * self.N):
+                    self.btns[i]["state"] = "disabled"
+            else:
+                for i in range(self.N * self.N):
+                    self.btns[i]["state"] = "normal" if (self.board[i] is None) else "disabled"
+
+        elif t=="ok":
+            self.chat_push(f"OK: {m.get('msg','')}")
+        elif t=="error":
+            items=m.get("rooms")
+            if items:
+                self.chat_push("ERROR: "+m.get("error",""))
+                self.chat_push("Phòng hiện có: "+", ".join(f"{it['id']}({it['n']})" for it in items))
+            else:
+                self.chat_push(f"ERROR: {m.get('error','')}")
+        elif t=="chat":
+            self.chat_push(f"[{m.get('ts','')}] {m.get('from','?')}: {m.get('text','')}")
+        elif t=="hello":
+            self.chat_push(m.get("msg",""))
+
+    def chat_push(self, line):
+        self.chatbox.configure(state="normal")
+        self.chatbox.insert("end", line+"\n")
+        self.chatbox.configure(state="disabled")
+        self.chatbox.see("end")
+
+
+if __name__=="__main__":
+    App().mainloop()
