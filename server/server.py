@@ -78,3 +78,69 @@ def push_state(room_id):
         "score": r.get("score", {"X": 0, "O": 0, "D": 0}),
     }
     broadcast_room(room_id, payload)
+
+    # ---- Winner K in N×N + trả về đường thắng ----
+def compute_winner_with_line(board, N, K):
+    def at(i,j):
+        if 0<=i<N and 0<=j<N: return board[i*N+j]
+        return None
+    dirs = [(1,0),(0,1),(1,1),(1,-1)]
+    for i in range(N):
+        for j in range(N):
+            first = at(i,j)
+            if not first: continue
+            for di,dj in dirs:
+                cells = [i*N+j]
+                ok=True
+                for step in range(1,K):
+                    if at(i+di*step, j+dj*step)==first:
+                        cells.append((i+di*step)*N + (j+dj*step))
+                    else:
+                        ok=False; break
+                if ok: return first, cells
+    if all(x is not None for x in board): return "D", []
+    return None, []
+
+def reset_room(room_id, N=None, K=None):
+    r = rooms[room_id]
+    if N:
+        r["N"] = N
+    if K:
+        r["K"] = K
+    r["board"] = [None] * (r["N"] * r["N"])
+    r["turn"] = "X"
+    r["winner"] = None
+    r["winline"] = []
+    # KHÔNG reset score, chỉ reset log
+    r["log"] = {
+        "meta": {
+            "room": room_id,
+            "N": r["N"],
+            "K": r["K"],
+            "created": now(),
+            "bot": r.get("bot", False),
+        },
+        "moves": [],
+    }
+    log(f"ROOM reset '{room_id}' -> N={r['N']},K={r['K']}")
+    push_state(room_id)
+
+def join_room(sock, name, room_id):
+    r = rooms[room_id]
+    mark = next_mark(r)
+    if mark is None: return False, "Room full"
+    r["players"].append({"sock":sock,"name":name or "Guest","mark":mark})
+    log(f"ROOM join '{room_id}': {name or 'Guest'} as {mark}")
+    push_state(room_id)
+    return True, "Joined"
+
+def leave_current(sock):
+    rid, r = room_of(sock)
+    if not r: return
+    left=None
+    r["players"] = [p for p in r["players"] if not ((p["sock"] is sock) and (left:=p["name"]))]
+    if left: log(f"ROOM leave '{rid}': {left}")
+    if not r["players"]:
+        rooms.pop(rid, None); log(f"ROOM remove '{rid}' (empty)")
+    else:
+        push_state(rid)
