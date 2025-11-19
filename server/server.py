@@ -43,7 +43,7 @@ def room_of(sock):
     for rid, r in rooms.items():
         for p in r["players"]:
             if p["sock"] is sock: return rid, r
-    return None, None
+    return None, None   
 
 def broadcast_room(room_id, payload):
     r = rooms.get(room_id)
@@ -98,7 +98,7 @@ def compute_winner_with_line(board, N, K):
                     else:
                         ok=False; break
                 if ok: return first, cells
-    if all(x is not None for x in board): return "D", []
+    if all(x is not None     for x in board): return "D", []
     return None, []
 
 def reset_room(room_id, N=None, K=None):
@@ -144,3 +144,32 @@ def leave_current(sock):
         rooms.pop(rid, None); log(f"ROOM remove '{rid}' (empty)")
     else:
         push_state(rid)
+def bot_move(room_id):
+    r = rooms[room_id]
+    if not r.get("bot"):
+        return
+    bot = next((p for p in r["players"] if p["name"] == "BOT"), None)
+    if not bot or r["winner"] or r["turn"] != bot["mark"]:
+        return
+
+    empties = [i for i, v in enumerate(r["board"]) if v is None]
+    if not empties:
+        return
+    N = r["N"]
+    center = (N * N) // 2
+    cell = center if center in empties else random.choice(empties)
+
+    r["board"][cell] = bot["mark"]
+    r["log"]["moves"].append({"ts": now(), "player": "BOT", "mark": bot["mark"], "cell": cell})
+    win, line = compute_winner_with_line(r["board"], r["N"], r["K"])
+    r["winner"], r["winline"] = win, line
+
+    if r["winner"]:
+        if win in ("X", "O", "D"):
+            r.setdefault("score", {"X": 0, "O": 0, "D": 0})
+            r["score"][win] += 1
+        push_state(room_id)
+        persist_log(room_id)
+    else:
+        r["turn"] = other(bot["mark"])
+        push_state(room_id)

@@ -70,7 +70,7 @@ class StartDialog(tk.Toplevel):
         self._update_mode()
 
     def _update_mode(self):
-        # hiện tại chưa cần disable radio, để người dùng chọn cho dễ
+        # hiện tại chưa cần disable radio, để người dùng chọn cho dễ    
         pass
 
     def _on_ok(self):
@@ -86,6 +86,30 @@ class StartDialog(tk.Toplevel):
 
     def _on_close(self):
         self.master.destroy()
+class App(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Caro Socket • GUI"); self.geometry("980x680"); self.configure(bg=BG); self.minsize(860,560)
+
+        # sẽ nhận từ StartDialog
+        self.host=HOST; self.port=PORT
+        self.sock=None; self.buf=""
+        self.my_name=tk.StringVar(value="Player")
+        self.room   =tk.StringVar(value="phong1")
+        self.sizeN  =tk.IntVar(value=10)
+        self.winK   =tk.IntVar(value=5)
+        self.turn   =tk.StringVar(value="-")
+        self.N=10; self.K=5
+        self.board=[]; self.btns=[]
+        self.winline=[]
+        self.score = {"X": 0, "O": 0, "D": 0}
+
+        self._init_style(); self._build_layout(); self.rebuild_board(self.N)
+        self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(2, weight=1)
+
+        # mở Start dialog
+        self.after(100, self.start_dialog)
+    def _norm_room(self): return (self.room.get() or "").strip().lower()
 
 class App(tk.Tk):
     def handle_msg(self, m):
