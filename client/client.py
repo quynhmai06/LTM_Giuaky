@@ -14,7 +14,7 @@ def recv_loop(sock):
             sys.exit(0)
         buf += data.decode(ENC)
         for msg, buf in unpack_lines(buf):
-            handle_msg(msg) 
+            handle_msg(msg)
 
 def handle_msg(m):
     t = m.get("type")
